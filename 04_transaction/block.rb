@@ -18,4 +18,9 @@ class Block
   def serialize
     Marshal.dump(self)
   end
+
+  def transactions_hash
+    transaction_ids = @transactions.map{|transaction| transaction.id}
+    Digest::SHA256.hexdigest transaction_ids.join
+  end
 end

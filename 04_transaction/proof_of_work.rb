@@ -11,7 +11,7 @@ class ProofOfWork
 
   def calcurate(nonce_limit)
     (1..nonce_limit).each{|nonce|
-      headers = @target_block.prev_block_hash.to_s + @target_block.data.to_s + @target_block.timestamp.to_s + nonce.to_s
+      headers = @target_block.prev_block_hash.to_s + @target_block.transactions_hash + @target_block.timestamp.to_s + nonce.to_s
       hash = Digest::SHA256.hexdigest headers   
       if (hash.hex < @target.hex)
         p nonce
@@ -25,7 +25,7 @@ class ProofOfWork
   end
 
   def validate
-    headers = @target_block.prev_block_hash.to_s + @target_block.data.to_s + @target_block.timestamp.to_s + @target_block.nonce.to_s
+    headers = @target_block.prev_block_hash.to_s + @target_block.transactions_hash.to_s + @target_block.timestamp.to_s + @target_block.nonce.to_s
     hash = Digest::SHA256.hexdigest headers
     hash.hex < @target.hex
   end
