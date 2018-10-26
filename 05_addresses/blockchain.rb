@@ -48,11 +48,11 @@ class Blockchain
     Marshal.load(data)
   end
 
-  def create_or_load
+  def create_or_load(address)
     redis = Redis.new(host: "localhost", port: 6379, db: 05)
     last_hash = redis.get "last_hash"
     if last_hash.nil?
-      coinbase_tx = create_coinbase_tx('ADDRESS', 'This is Coinbase Transaction.')
+      coinbase_tx = create_coinbase_tx(address, 'This is Coinbase Transaction.')
       create_genesis_block(coinbase_tx)
     else
       p last_hash
@@ -71,32 +71,33 @@ class Blockchain
   end
 
   def find_utxs(address)
-    spent_txos = []
+    spent_txos = {}
     utxs = []
     blocks = BlockchainScanner.new.scan
-    catch(:break_loop) do
-      blocks.each {|block|
-        block.transactions.each{|transaction|
-          transaction.outputs.each.with_index{|output, output_idx|
+    blocks.each do |block|
+      block.transactions.each do |transaction|
+        catch(:break_loop) do
+          transaction.outputs.each.with_index do |output, output_idx|
             if spent_txos[transaction.id] != nil
-              spent_txos[transaction.id].each{|spent_out|
-                throw :break_loop if spent_out == output_index
-              }
+              spent_txos[transaction.id].each do |spent_out|
+                throw :break_loop if spent_out == output_idx
+              end
             end
-            if output.can_be_unlocked_with(address)
+            if output.is_locked_with_key(address)
               utxs.push transaction
             end
-          }
-          unless transaction.is_coinbase?
-            transaction.inputs.each{|input|
-              if input.can_unlock_output_with(address)
-                spent_txos[input.transaction_id].push input.output
-              end
-            }
           end
-        }
-        break if block.prev_block_hash == ""
-      }
+        end
+        unless transaction.is_coinbase?
+          transaction.inputs.each do |input|
+            if input.uses_key(address)
+              spent_txos[input.transaction_id] = [] if spent_txos[input.transaction_id].nil?
+              spent_txos[input.transaction_id].push input.output
+            end
+          end
+        end
+      end
+      break if block.prev_block_hash == ""
     end
     utxs
   end
@@ -106,7 +107,7 @@ class Blockchain
     utxs = find_utxs(address)
     utxs.each do |utx|
       utx.outputs.each do |output|
-        if output.can_be_unlocked_with(address)
+        if output.is_locked_with_key(address)
           utxos.push output
         end
       end
@@ -118,7 +119,7 @@ class Blockchain
     inputs = []
     outputs = []
     acc, valid_outputs = find_spendable_output(from, amount)
-    return if acc < amount
+    return "this account doesn't have enough coin." if acc < amount
 
     valid_outputs.each do |transaction_idx, output_idxs|
       output_idxs.each do |output|
@@ -142,9 +143,8 @@ class Blockchain
     accumulated = 0
     catch(:break_loop) do
       unspent_transactions.each do |transaction|
-        p transaction
         transaction.outputs.each.with_index do |output, output_index|
-          if output.can_be_unlocked_with(address) && accumulated < amount
+          if output.is_locked_with_key(address) && accumulated < amount
             accumulated += output.value
             unspent_outputs[transaction.id] = [] if unspent_outputs[transaction.id].nil?
             unspent_outputs[transaction.id].push output_index
@@ -163,8 +163,8 @@ class Blockchain
 
   def new_key_pair
     group = ECDSA::Group::Secp256k1
-    #private_key = 1 + SecureRandom.random_number(group.order - 1)
-    private_key = "18e14a7b6a307f426a94f8114701e7c8e774e7f9a47e2c2035db29a206321725".hex
+    private_key = 1 + SecureRandom.random_number(group.order - 1)
+    #private_key = "18e14a7b6a307f426a94f8114701e7c8e774e7f9a47e2c2035db29a206321725".hex
     public_key = group.generator.multiply_by_scalar(private_key)
     return private_key, public_key
   end
