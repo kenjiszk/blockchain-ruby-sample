@@ -25,6 +25,13 @@ class Blockchain
   end
 
   def create_block(transactions, prev_block_hash)
+    transactions.each do |transaction|
+      break if prev_block_hash == ""
+      if ! verify_transaction(transaction)
+        return "Invalid Transaction!"
+      end
+    end
+
     block = Block.new(Time.now.to_i, transactions, prev_block_hash)
     pow = ProofOfWork.new(block)
     if pow.calcurate(@nonce_limit)
@@ -48,11 +55,11 @@ class Blockchain
     Marshal.load(data)
   end
 
-  def create_or_load(address)
+  def create_or_load(wallet)
     redis = Redis.new(host: "localhost", port: 6379, db: 05)
     last_hash = redis.get "last_hash"
     if last_hash.nil?
-      coinbase_tx = create_coinbase_tx(address, 'This is Coinbase Transaction.')
+      coinbase_tx = create_coinbase_tx(wallet, 'This is Coinbase Transaction.')
       create_genesis_block(coinbase_tx)
     else
       p last_hash
@@ -115,7 +122,8 @@ class Blockchain
     utxos
   end
 
-  def new_utxo_transaction(from, to, amount)
+  def new_utxo_transaction(wallet, to, amount)
+    from = wallet.address
     inputs = []
     outputs = []
     acc, valid_outputs = find_spendable_output(from, amount)
@@ -134,6 +142,7 @@ class Blockchain
 
     tx = Transaction.new(nil, inputs, outputs)
     tx.set_id
+    sign_transaction(tx, wallet.private_key)
     tx
   end
 
@@ -164,8 +173,36 @@ class Blockchain
   def new_key_pair
     group = ECDSA::Group::Secp256k1
     private_key = 1 + SecureRandom.random_number(group.order - 1)
-    #private_key = "18e14a7b6a307f426a94f8114701e7c8e774e7f9a47e2c2035db29a206321725".hex
     public_key = group.generator.multiply_by_scalar(private_key)
     return private_key, public_key
+  end
+
+  def find_transaction(id)
+    blocks = BlockchainScanner.new.scan
+    blocks.each do |block|
+      block.transactions.each do |transaction|
+        return transaction if id == transaction.id
+      end
+    end
+    return []
+  end
+
+  def sign_transaction(transaction, private_key)
+    prev_transactions = {}
+    transaction.inputs.each do |input|
+      prev_transaction = find_transaction(input.transaction_id)
+      prev_transactions[prev_transaction.id] = prev_transaction
+    end
+    transaction.sign(private_key, prev_transactions)
+  end
+
+  def verify_transaction(transaction)
+    prev_transactions = {}
+    transaction.inputs.each do |input|
+      prev_transaction = find_transaction(input.transaction_id)
+      prev_transactions[prev_transaction.id] = prev_transaction
+    end
+
+    return transaction.verify(prev_transactions)
   end
 end

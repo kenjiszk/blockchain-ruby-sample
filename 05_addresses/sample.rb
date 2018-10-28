@@ -1,40 +1,35 @@
 require './blockchain.rb'
 
-bc = Blockchain.new
-bc.create_or_load("1LxZYbiwHi1vfD1ugxMMTs2FHZ7X7mHvNn")
+addr0= "1CK4ngUe4ECAYsKvfDijHETHAGNgBakjQj"
+addr1 = "1LxZYbiwHi1vfD1ugxMMTs2FHZ7X7mHvNn"
+addr2 = "1Q1pm9RwDELxFdPS3pw2CLzDs1r6hBEXNv"
 
+bc = Blockchain.new
+
+#wallet = Wallet.restore("17NGPUtEhZLGnmv8wVsuQyYdyyBKkxhj8r")
 #wallet = bc.new_wallet
 #p "ADDRESS : " + wallet.address
+#wallet.save
 
-#utxos = bc.utxos("1LxZYbiwHi1vfD1ugxMMTs2FHZ7X7mHvNn")
-#p utxos
-#balance = 0
-#utxos.each do |utxo|
-#  p utxo
-#  balance += utxo.value
-#end
-#p balance
+bc.create_or_load("1CK4ngUe4ECAYsKvfDijHETHAGNgBakjQj")
 
-tx = bc.new_utxo_transaction(
-  "1LxZYbiwHi1vfD1ugxMMTs2FHZ7X7mHvNn",
-  "1Q1pm9RwDELxFdPS3pw2CLzDs1r6hBEXNv",
-  10
-)
+def balance(bc, addr)
+  utxos = bc.utxos(addr)
+  balance = 0
+  utxos.each do |utxo|
+    balance += utxo.value
+  end
+  p balance
+end
 
-tx.sign
-#bc.add_block([tx])
+#wallet = bc.new_wallet
+wallet = Wallet.restore(addr0)
+p "ADDRESS : " + wallet.address
+p wallet.public_key
 
+tx = bc.new_utxo_transaction(wallet, addr1, 1)
+bc.add_block([tx])
 
-#utxos = bc.utxos("1LxZYbiwHi1vfD1ugxMMTs2FHZ7X7mHvNn")
-#balance = 0
-#utxos.each do |utxo|
-#  balance += utxo.value
-#end
-#p balance
-
-#utxos = bc.utxos("1Q1pm9RwDELxFdPS3pw2CLzDs1r6hBEXNv")
-#balance = 0
-#utxos.each do |utxo|
-#  balance += utxo.value
-#end
-#p balance
+[addr0, addr1, addr2].each do |addr|
+  balance(bc, addr)
+end
