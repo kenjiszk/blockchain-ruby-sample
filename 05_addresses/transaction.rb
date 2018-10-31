@@ -24,17 +24,15 @@ class Transaction
     tx_copy = trimmed_copy
     tx_copy.inputs.each.with_index do |input, input_idx|
       prev_tx = prev_transactions[input.transaction_id]
-      input.signature = nil
-      input.pubkey = prev_tx.outputs[input.output].pubkey_hash
-      #tx_copy.id = tx_copy.hash
-      tx_copy.id = 'AAAA'
-      input.pubkey = nil
+      tx_copy.inputs[input_idx].signature = nil
+      tx_copy.inputs[input_idx].pubkey = prev_tx.outputs[input.output].pubkey_hash
+      tx_copy.id = tx_copy.get_hash
+      tx_copy.inputs[input_idx].pubkey = nil
 
       group = ECDSA::Group::Secp256k1
       nonce = 1 + SecureRandom.random_number(group.order - 1)
       sig = ECDSA.sign(group, private_key, tx_copy.id, nonce)
       signature = ECDSA::Format::SignatureDerString.encode(sig)
-      p signature
       @inputs[input_idx].signature = signature
     end
   end
@@ -59,32 +57,24 @@ class Transaction
       prev_tx = prev_transactions[input.transaction_id]
       tx_copy.inputs[input_idx].signature = nil
       tx_copy.inputs[input_idx].pubkey = prev_tx.outputs[input.output].pubkey_hash
-      tx_copy.id = tx_copy.hash
+      tx_copy.id = tx_copy.get_hash
       tx_copy.inputs[input_idx].pubkey = nil
 
-      p input.signature
       decode_sig = ECDSA::Format::SignatureDerString.decode(input.signature)
-      p decode_sig
-      #pubkeys = ECDSA.recover_public_key(ECDSA::Group::Secp256k1, tx_copy.id, decode_sig).map do |p|
-      #  ECDSA::Format::PointOctetString.encode(p, compression: true)
-      #end
-      #pubkeys = ECDSA.recover_public_key(ECDSA::Group::Secp256k1, tx_copy.id, decode_sig).map do |pub|
-      pubkeys = ECDSA.recover_public_key(ECDSA::Group::Secp256k1, 'AAAA', decode_sig).map do |pub|
+      pubkeys = ECDSA.recover_public_key(ECDSA::Group::Secp256k1, tx_copy.id, decode_sig).map do |pub|
         ECDSA::Format::PointOctetString.encode(pub, compression: true).unpack("H*")
       end
       pubkeys.each do |pub|
         pure_pubkey = pub[0][2..-1]
         address = pub_to_address(pure_pubkey)
-        p address
-        p input.pubkey
+        return true if address == input.pubkey
       end
-      #ECDSA.valid_signature?(pubkey, tx_copy.id, decode_sig)
+      p "Invalid transaction"
       return false
     end
   end
 
   def pub_to_address(pubkey)
-    p pubkey
     pubkey = "02" + pubkey
     sha256_pubkey = Digest::SHA256.hexdigest [pubkey].pack("H*")
     rmd160_sha256_pubkey = Digest::RMD160.hexdigest [sha256_pubkey].pack("H*")
@@ -95,5 +85,13 @@ class Transaction
     checksum = sha256_sha256_versoined_rmd160_sha256_pubkey[0..7]
     row_address = versoined_rmd160_sha256_pubkey + checksum
     address = Base58.binary_to_base58([row_address].pack("H*"), :bitcoin)
+  end
+
+  def get_hash
+    components = ""
+    self.inputs.each do |input|
+      components += input.pubkey
+    end
+    hash = Digest::SHA256.hexdigest components
   end
 end

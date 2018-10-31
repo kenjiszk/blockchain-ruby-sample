@@ -1,8 +1,8 @@
 require './blockchain.rb'
 
-addr0= "1CK4ngUe4ECAYsKvfDijHETHAGNgBakjQj"
-addr1 = "1LxZYbiwHi1vfD1ugxMMTs2FHZ7X7mHvNn"
-addr2 = "1Q1pm9RwDELxFdPS3pw2CLzDs1r6hBEXNv"
+addr0 = "1Lwd6HuFyJ962GkPjJ6gEjw7GcYKpZPfxT"
+addr1 = "176adNAm3UYa22NrDcRv7XF7AJ8oiDWpWt"
+addr2 = "19vmzSM6LETdmMq33NYkRhyUbFFpuUYPTL"
 
 bc = Blockchain.new
 
@@ -11,7 +11,7 @@ bc = Blockchain.new
 #p "ADDRESS : " + wallet.address
 #wallet.save
 
-bc.create_or_load("1CK4ngUe4ECAYsKvfDijHETHAGNgBakjQj")
+bc.create_or_load(addr0)
 
 def balance(bc, addr)
   utxos = bc.utxos(addr)
@@ -22,10 +22,11 @@ def balance(bc, addr)
   p balance
 end
 
-#wallet = bc.new_wallet
+# wallet = bc.new_wallet
 wallet = Wallet.restore(addr0)
 p "ADDRESS : " + wallet.address
-p wallet.public_key
+# p wallet.public_key
+# wallet.save
 
 tx = bc.new_utxo_transaction(wallet, addr1, 1)
 bc.add_block([tx])
